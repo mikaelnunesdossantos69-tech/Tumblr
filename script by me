@@ -1,0 +1,609 @@
+-- Coloque este script em: StarterPlayer > StarterPlayerScripts (como LocalScript)
+-- Ou dentro de um LocalScript no StarterGui
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+------------------------------------------------------------
+-- CORES DO TEMA
+------------------------------------------------------------
+local COR_FUNDO_PAINEL = Color3.fromRGB(230, 241, 250) -- E6F1FA
+local COR_FUNDO_OPCOES = Color3.fromRGB(201, 222, 239) -- C9DEEF
+local COR_BOTAO_ATIVO  = Color3.fromRGB(175, 203, 227) -- AFCBE3
+local COR_TEXTO        = Color3.fromRGB(30, 40, 60)    -- Texto escuro
+
+------------------------------------------------------------
+-- REMOVER GUI ANTIGA SE EXISTIR
+------------------------------------------------------------
+local oldGui = playerGui:FindFirstChild("IluminacaoPainelGUI")
+if oldGui then oldGui:Destroy() end
+local oldGlassyGui = playerGui:FindFirstChild("GlassyUI_Panel")
+if oldGlassyGui then oldGlassyGui:Destroy() end
+
+------------------------------------------------------------
+-- CRIAR GUI PRINCIPAL
+------------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IluminacaoPainelGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+-- Botão flutuante (quando painel estiver fechado)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "ToggleButton"
+toggleButton.Size = UDim2.new(0, 45, 0, 45)
+toggleButton.Position = UDim2.new(0, 20, 0, 200)
+toggleButton.BackgroundColor3 = COR_FUNDO_OPCOES
+toggleButton.BorderSizePixel = 0
+toggleButton.Text = "💡"
+toggleButton.TextSize = 22
+toggleButton.TextColor3 = COR_TEXTO
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.Visible = false
+toggleButton.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+------------------------------------------------------------
+-- PAINEL PRINCIPAL
+------------------------------------------------------------
+local painel = Instance.new("Frame")
+painel.Name = "Painel"
+painel.Size = UDim2.new(0, 280, 0, 460)
+painel.Position = UDim2.new(0, 20, 0, 200)
+painel.BackgroundColor3 = COR_FUNDO_PAINEL
+painel.BorderSizePixel = 0
+painel.Active = true
+painel.Draggable = true
+painel.Parent = screenGui
+
+local painelCorner = Instance.new("UICorner")
+painelCorner.CornerRadius = UDim.new(0, 10)
+painelCorner.Parent = painel
+
+local painelStroke = Instance.new("UIStroke")
+painelStroke.Color = Color3.fromRGB(180, 200, 220)
+painelStroke.Thickness = 1.5
+painelStroke.Parent = painel
+
+------------------------------------------------------------
+-- BARRA DE TÍTULO
+------------------------------------------------------------
+local titulo = Instance.new("Frame")
+titulo.Name = "Titulo"
+titulo.Size = UDim2.new(1, 0, 0, 32)
+titulo.BackgroundColor3 = COR_FUNDO_OPCOES
+titulo.BorderSizePixel = 0
+titulo.Parent = painel
+
+local tituloCorner = Instance.new("UICorner")
+tituloCorner.CornerRadius = UDim.new(0, 10)
+tituloCorner.Parent = titulo
+
+local tituloTexto = Instance.new("TextLabel")
+tituloTexto.Size = UDim2.new(1, -40, 1, 0)
+tituloTexto.Position = UDim2.new(0, 10, 0, 0)
+tituloTexto.BackgroundTransparency = 1
+tituloTexto.Text = "⚙️ Configurações"
+tituloTexto.TextColor3 = COR_TEXTO
+tituloTexto.TextXAlignment = Enum.TextXAlignment.Left
+tituloTexto.Font = Enum.Font.GothamBold
+tituloTexto.TextSize = 13
+tituloTexto.Parent = titulo
+
+-- Botão fechar
+local fecharBtn = Instance.new("TextButton")
+fecharBtn.Size = UDim2.new(0, 26, 0, 26)
+fecharBtn.Position = UDim2.new(1, -30, 0, 3)
+fecharBtn.BackgroundColor3 = Color3.fromRGB(220, 100, 100)
+fecharBtn.BorderSizePixel = 0
+fecharBtn.Text = "−"
+fecharBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fecharBtn.TextSize = 18
+fecharBtn.Font = Enum.Font.GothamBold
+fecharBtn.Parent = titulo
+
+local fecharCorner = Instance.new("UICorner")
+fecharCorner.CornerRadius = UDim.new(0, 6)
+fecharCorner.Parent = fecharBtn
+
+------------------------------------------------------------
+-- CONTAINER DE SCROLL
+------------------------------------------------------------
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -20, 1, -45)
+scroll.Position = UDim2.new(0, 10, 0, 40)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4
+scroll.CanvasSize = UDim2.new(0, 0, 0, 650) -- Aumentado para caber os novos itens
+scroll.Parent = painel
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 12)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = scroll
+
+------------------------------------------------------------
+-- FUNÇÕES AUXILIARES
+------------------------------------------------------------
+local function criarLabel(texto)
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, 0, 0, 20)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = texto
+	lbl.TextColor3 = COR_TEXTO
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 12
+	lbl.Parent = scroll
+	return lbl
+end
+
+local function criarSlider(textoLabel, minVal, maxVal, valorInicial, isFloat, callback)
+	criarLabel(textoLabel)
+	
+	local sliderFrame = Instance.new("Frame")
+	sliderFrame.Size = UDim2.new(1, 0, 0, 26)
+	sliderFrame.BackgroundColor3 = COR_FUNDO_OPCOES
+	sliderFrame.BorderSizePixel = 0
+	sliderFrame.Parent = scroll
+	local sCorner = Instance.new("UICorner")
+	sCorner.CornerRadius = UDim.new(0, 6)
+	sCorner.Parent = sliderFrame
+	
+	local pctInicial = (valorInicial - minVal) / (maxVal - minVal)
+	
+	local sliderFill = Instance.new("Frame")
+	sliderFill.Size = UDim2.new(pctInicial, 0, 1, 0)
+	sliderFill.BackgroundColor3 = Color3.fromRGB(130, 170, 210)
+	sliderFill.BorderSizePixel = 0
+	sliderFill.Parent = sliderFrame
+	local fCorner = Instance.new("UICorner")
+	fCorner.CornerRadius = UDim.new(0, 6)
+	fCorner.Parent = sliderFill
+	
+	local sliderText = Instance.new("TextLabel")
+	sliderText.Size = UDim2.new(1, 0, 1, 0)
+	sliderText.BackgroundTransparency = 1
+	sliderText.Text = isFloat and string.format("%.1f", valorInicial) or tostring(math.floor(valorInicial))
+	sliderText.TextColor3 = COR_TEXTO
+	sliderText.Font = Enum.Font.GothamBold
+	sliderText.TextSize = 12
+	sliderText.ZIndex = 2
+	sliderText.Parent = sliderFrame
+	
+	local draggingSlider = false
+	
+	local function atualizarSlider(input)
+		local posX = math.clamp(input.Position.X - sliderFrame.AbsolutePosition.X, 0, sliderFrame.AbsoluteSize.X)
+		local pct = posX / sliderFrame.AbsoluteSize.X
+		local valorAtual = minVal + (pct * (maxVal - minVal))
+		
+		sliderFill.Size = UDim2.new(pct, 0, 1, 0)
+		
+		if isFloat then
+			sliderText.Text = string.format("%.1f", valorAtual)
+		else
+			valorAtual = math.floor(valorAtual)
+			sliderText.Text = tostring(valorAtual)
+		end
+		
+		callback(valorAtual)
+	end
+	
+	sliderFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingSlider = true
+			atualizarSlider(input)
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			atualizarSlider(input)
+		end
+	end)
+	
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingSlider = false
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- CONFIGURAÇÕES DE ILUMINAÇÃO
+------------------------------------------------------------
+-- 1. ATIVAR SOMBRAS
+criarLabel("Enable Game Shadows")
+local btnShadows = Instance.new("TextButton")
+btnShadows.Size = UDim2.new(1, 0, 0, 30)
+btnShadows.BorderSizePixel = 0
+btnShadows.TextColor3 = COR_TEXTO
+btnShadows.Font = Enum.Font.GothamBold
+btnShadows.TextSize = 13
+btnShadows.Parent = scroll
+local bsCorner = Instance.new("UICorner")
+bsCorner.CornerRadius = UDim.new(0, 6)
+bsCorner.Parent = btnShadows
+
+local function atualizarBtnShadows()
+	if Lighting.GlobalShadows then
+		btnShadows.Text = "ON"
+		btnShadows.BackgroundColor3 = COR_BOTAO_ATIVO
+	else
+		btnShadows.Text = "OFF"
+		btnShadows.BackgroundColor3 = Color3.fromRGB(230, 200, 200)
+	end
+end
+atualizarBtnShadows()
+
+btnShadows.MouseButton1Click:Connect(function()
+	Lighting.GlobalShadows = not Lighting.GlobalShadows
+	atualizarBtnShadows()
+end)
+
+-- 2. BRILHO DO JOGO
+local brilhoAtualUI = Lighting.Brightness * 2
+criarSlider("Change Game Brightness (0-10)", 0, 10, brilhoAtualUI, true, function(valor)
+	Lighting.Brightness = valor * 0.5
+end)
+
+-- 3. HORÁRIO DO JOGO
+local horaAtual = Lighting.ClockTime
+criarSlider("Change Clock Time (0-24)", 0, 24, horaAtual, false, function(valor)
+	Lighting.ClockTime = valor
+end)
+
+-- 4. FORÇA DA NEBLINA
+local forcaNeblinaAtual = 50
+criarSlider("Set Fog Strength (0-100)", 0, 100, forcaNeblinaAtual, false, function(valor)
+	if valor == 0 then
+		Lighting.FogEnd = 100000
+		Lighting.FogStart = 0
+	else
+		local t = valor / 100
+		local fogEnd = 5000 * math.pow(1 - t, 2.5) + 40
+		Lighting.FogEnd = fogEnd
+		Lighting.FogStart = fogEnd * 0.05
+	end
+end)
+
+------------------------------------------------------------
+-- CONFIGURAÇÕES DO GLASSY (Injetado)
+------------------------------------------------------------
+criarLabel("Glassy Effect")
+local btnGlassyToggle = Instance.new("TextButton")
+btnGlassyToggle.Size = UDim2.new(1, 0, 0, 30)
+btnGlassyToggle.BorderSizePixel = 0
+btnGlassyToggle.TextColor3 = COR_TEXTO
+btnGlassyToggle.Font = Enum.Font.GothamBold
+btnGlassyToggle.TextSize = 13
+btnGlassyToggle.Parent = scroll
+local bgtCorner = Instance.new("UICorner")
+bgtCorner.CornerRadius = UDim.new(0, 6)
+bgtCorner.Parent = btnGlassyToggle
+
+local GLASS_REFLECTANCE = 0.15
+local isGlassyEnabled = false
+local originalState = {}
+local glassConnections = {}
+
+local function getMyHead()
+	local char = player.Character
+	if not char then return nil end
+	return char:FindFirstChild("Head")
+end
+
+local function isMyHeadOrDescendant(part)
+	local head = getMyHead()
+	if not head then return false end
+	return part == head or part:IsDescendantOf(head)
+end
+
+local function shouldAffect(part)
+	if not part:IsA("BasePart") then return false end
+	if isMyHeadOrDescendant(part) then return false end
+	if part:IsA("Terrain") then return false end
+	return true
+end
+
+local function saveAndApply(part)
+	if originalState[part] then return end
+	originalState[part] = {
+		Material = part.Material,
+		Reflectance = part.Reflectance,
+		Transparency = part.Transparency,
+		Color = part.Color,
+	}
+	part.Material = Enum.Material.Glass
+	part.Reflectance = GLASS_REFLECTANCE
+end
+
+local function restore(part)
+	local s = originalState[part]
+	if not s then return end
+	if part.Parent then
+		part.Material = s.Material
+		part.Reflectance = s.Reflectance
+		part.Transparency = s.Transparency
+		part.Color = s.Color
+	end
+	originalState[part] = nil
+end
+
+local function applyToAll()
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if shouldAffect(obj) then
+			saveAndApply(obj)
+		end
+	end
+end
+
+local function restoreAll()
+	for part, _ in pairs(originalState) do
+		restore(part)
+	end
+	originalState = {}
+end
+
+local function connectNew()
+	table.insert(glassConnections, workspace.DescendantAdded:Connect(function(obj)
+		if isGlassyEnabled and shouldAffect(obj) then
+			task.wait()
+			if obj.Parent then
+				saveAndApply(obj)
+			end
+		end
+	end))
+end
+
+local function disconnectAll()
+	for _, c in ipairs(glassConnections) do c:Disconnect() end
+	glassConnections = {}
+end
+
+local function atualizarBtnGlassy()
+	if isGlassyEnabled then
+		btnGlassyToggle.Text = "ON"
+		btnGlassyToggle.BackgroundColor3 = COR_BOTAO_ATIVO
+	else
+		btnGlassyToggle.Text = "OFF"
+		btnGlassyToggle.BackgroundColor3 = Color3.fromRGB(230, 200, 200)
+	end
+end
+atualizarBtnGlassy()
+
+btnGlassyToggle.MouseButton1Click:Connect(function()
+	isGlassyEnabled = not isGlassyEnabled
+	if isGlassyEnabled then
+		applyToAll()
+		connectNew()
+	else
+		restoreAll()
+		disconnectAll()
+	end
+	atualizarBtnGlassy()
+end)
+
+-- Slider do Glassy (Vai de 0 a 50, e dividimos por 100 para ter o reflexo de 0.0 a 0.5)
+criarSlider("Glassy Reflectance (0-50)", 0, 50, 15, false, function(valor)
+	GLASS_REFLECTANCE = valor / 100
+	if isGlassyEnabled then
+		for part, _ in pairs(originalState) do
+			if part.Parent then
+				part.Reflectance = GLASS_REFLECTANCE
+			end
+		end
+	end
+end)
+
+------------------------------------------------------------
+-- BOTÃO PARA ABRIR O SELETOR DE COR DA NEBLINA
+------------------------------------------------------------
+criarLabel("Change Fog Colour")
+local btnAbrirCor = Instance.new("TextButton")
+btnAbrirCor.Size = UDim2.new(1, 0, 0, 30)
+btnAbrirCor.BackgroundColor3 = COR_FUNDO_OPCOES
+btnAbrirCor.BorderSizePixel = 0
+btnAbrirCor.Text = "Abrir Seletor de Cor"
+btnAbrirCor.TextColor3 = COR_TEXTO
+btnAbrirCor.Font = Enum.Font.GothamBold
+btnAbrirCor.TextSize = 13
+btnAbrirCor.Parent = scroll
+local bacCorner = Instance.new("UICorner")
+bacCorner.CornerRadius = UDim.new(0, 6)
+bacCorner.Parent = btnAbrirCor
+
+------------------------------------------------------------
+-- SISTEMA DE COR (COLOR PICKER)
+------------------------------------------------------------
+local colorPickerFrame = Instance.new("Frame")
+colorPickerFrame.Name = "ColorPickerFrame"
+colorPickerFrame.Size = UDim2.new(0, 320, 0, 380)
+colorPickerFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+colorPickerFrame.BackgroundColor3 = COR_FUNDO_PAINEL
+colorPickerFrame.BorderSizePixel = 0
+colorPickerFrame.Visible = false
+colorPickerFrame.ZIndex = 100
+colorPickerFrame.Parent = screenGui
+
+local cpCorner = Instance.new("UICorner")
+cpCorner.CornerRadius = UDim.new(0, 10)
+cpCorner.Parent = colorPickerFrame
+
+local cpStroke = Instance.new("UIStroke")
+cpStroke.Color = Color3.fromRGB(150, 170, 190)
+cpStroke.Thickness = 2
+cpStroke.Parent = colorPickerFrame
+
+local cpTitle = Instance.new("TextLabel")
+cpTitle.Size = UDim2.new(1, -40, 0, 40)
+cpTitle.Position = UDim2.new(0, 15, 0, 5)
+cpTitle.BackgroundTransparency = 1
+cpTitle.Text = "Change Fog Colour"
+cpTitle.TextColor3 = COR_TEXTO
+cpTitle.TextXAlignment = Enum.TextXAlignment.Left
+cpTitle.Font = Enum.Font.GothamBold
+cpTitle.TextSize = 18
+cpTitle.Parent = colorPickerFrame
+
+local cpClose = Instance.new("TextButton")
+cpClose.Size = UDim2.new(0, 30, 0, 30)
+cpClose.Position = UDim2.new(1, -40, 0, 10)
+cpClose.BackgroundColor3 = Color3.fromRGB(220, 100, 100)
+cpClose.BorderSizePixel = 0
+cpClose.Text = "X"
+cpClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+cpClose.Font = Enum.Font.GothamBold
+cpClose.TextSize = 14
+cpClose.Parent = colorPickerFrame
+local cpCloseCorner = Instance.new("UICorner")
+cpCloseCorner.CornerRadius = UDim.new(0, 6)
+cpCloseCorner.Parent = cpClose
+
+local svBox = Instance.new("Frame")
+svBox.Size = UDim2.new(0, 180, 0, 180)
+svBox.Position = UDim2.new(0, 20, 0, 50)
+svBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+svBox.BorderSizePixel = 0
+svBox.Parent = colorPickerFrame
+local svCorner = Instance.new("UICorner")
+svCorner.CornerRadius = UDim.new(0, 4)
+svCorner.Parent = svBox
+
+local satGradient = Instance.new("Frame")
+satGradient.Size = UDim2.new(1, 0, 1, 0)
+satGradient.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+satGradient.BorderSizePixel = 0
+satGradient.Parent = svBox
+local satGrad = Instance.new("UIGradient")
+satGrad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(255,255,255))
+satGrad.Transparency = NumberSequence.new(0, 1)
+satGrad.Parent = satGradient
+local satCorner = Instance.new("UICorner")
+satCorner.CornerRadius = UDim.new(0, 4)
+satCorner.Parent = satGradient
+
+local valGradient = Instance.new("Frame")
+valGradient.Size = UDim2.new(1, 0, 1, 0)
+valGradient.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+valGradient.BorderSizePixel = 0
+valGradient.Parent = svBox
+local valGrad = Instance.new("UIGradient")
+valGrad.Color = ColorSequence.new(Color3.fromRGB(0,0,0), Color3.fromRGB(0,0,0))
+valGrad.Transparency = NumberSequence.new(1, 0)
+valGrad.Rotation = 90
+valGrad.Parent = valGradient
+local valCorner = Instance.new("UICorner")
+valCorner.CornerRadius = UDim.new(0, 4)
+valCorner.Parent = valGradient
+
+local svCursor = Instance.new("Frame")
+svCursor.Size = UDim2.new(0, 12, 0, 12)
+svCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+svCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+svCursor.BorderSizePixel = 2
+svCursor.BorderColor3 = Color3.fromRGB(0, 0, 0)
+svCursor.Parent = svBox
+local svCursorCorner = Instance.new("UICorner")
+svCursorCorner.CornerRadius = UDim.new(1, 0)
+svCursorCorner.Parent = svCursor
+
+local hueBar = Instance.new("Frame")
+hueBar.Size = UDim2.new(0, 20, 0, 180)
+hueBar.Position = UDim2.new(0, 210, 0, 50)
+hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+hueBar.BorderSizePixel = 0
+hueBar.Parent = colorPickerFrame
+local hueCorner = Instance.new("UICorner")
+hueCorner.CornerRadius = UDim.new(1, 0)
+hueCorner.Parent = hueBar
+
+local hueGradient = Instance.new("UIGradient")
+hueGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+	ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+	ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)),
+	ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+})
+hueGradient.Rotation = 90
+hueGradient.Parent = hueBar
+
+local hueCursor = Instance.new("Frame")
+hueCursor.Size = UDim2.new(0, 24, 0, 10)
+hueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+hueCursor.Position = UDim2.new(0.5, 0, 0, 0)
+hueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+hueCursor.BorderSizePixel = 2
+hueCursor.BorderColor3 = Color3.fromRGB(0, 0, 0)
+hueCursor.Parent = hueBar
+local hueCursorCorner = Instance.new("UICorner")
+hueCursorCorner.CornerRadius = UDim.new(0, 3)
+hueCursorCorner.Parent = hueCursor
+
+local previewBox = Instance.new("Frame")
+previewBox.Size = UDim2.new(0, 50, 0, 180)
+previewBox.Position = UDim2.new(0, 250, 0, 50)
+previewBox.BackgroundColor3 = Lighting.FogColor
+previewBox.BorderSizePixel = 2
+previewBox.BorderColor3 = Color3.fromRGB(150, 170, 190)
+previewBox.Parent = colorPickerFrame
+local prevCorner = Instance.new("UICorner")
+prevCorner.CornerRadius = UDim.new(0, 4)
+prevCorner.Parent = previewBox
+
+local btnConfirm = Instance.new("TextButton")
+btnConfirm.Size = UDim2.new(0, 140, 0, 40)
+btnConfirm.Position = UDim2.new(0, 20, 0, 250)
+btnConfirm.BackgroundColor3 = Color3.fromRGB(100, 180, 100)
+btnConfirm.BorderSizePixel = 0
+btnConfirm.Text = "Confirm"
+btnConfirm.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnConfirm.Font = Enum.Font.GothamBold
+btnConfirm.TextSize = 16
+btnConfirm.Parent = colorPickerFrame
+local bcCorner = Instance.new("UICorner")
+bcCorner.CornerRadius = UDim.new(0, 6)
+bcCorner.Parent = btnConfirm
+
+local btnReset = Instance.new("TextButton")
+btnReset.Size = UDim2.new(0, 140, 0, 40)
+btnReset.Position = UDim2.new(0, 160, 0, 250)
+btnReset.BackgroundColor3 = Color3.fromRGB(230, 140, 80)
+btnReset.BorderSizePixel = 0
+btnReset.Text = "Reset To Default"
+btnReset.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnReset.Font = Enum.Font.GothamBold
+btnReset.TextSize = 14
+btnReset.Parent = colorPickerFrame
+local brCorner = Instance.new("UICorner")
+brCorner.CornerRadius = UDim.new(0, 6)
+brCorner.Parent = btnReset
+
+------------------------------------------------------------
+-- LÓGICA DO COLOR PICKER
+------------------------------------------------------------
+local currentH = 0
+local currentS = 1
+local currentV = 1
+
+local function atualizarCorFinal()
+	local cor = Color3.fromHSV(currentH, currentS, currentV)
+	previewBox.BackgroundColor3 = cor
+	return cor
+end
+
+local function atualizarSVBox()
+	local corBase = Color3.fromHSV(currentH
